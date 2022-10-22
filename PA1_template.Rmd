@@ -1,25 +1,174 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "RRP1"
+author: "Isaac Mothomoholo"
+date: "2022-10-22"
+output: html_document
 ---
 
+## Introduction
 
-## Loading and preprocessing the data
+It is now possible to collect a large amount of data about personal
+movement using activity monitoring devices such as a
+[Fitbit](http://www.fitbit.com), [Nike
+Fuelband](http://www.nike.com/us/en_us/c/nikeplus-fuelband), or
+[Jawbone Up](https://jawbone.com/up). These type of devices are part of
+the "quantified self" movement -- a group of enthusiasts who take
+measurements about themselves regularly to improve their health, to
+find patterns in their behavior, or because they are tech geeks. But
+these data remain under-utilized both because the raw data are hard to
+obtain and there is a lack of statistical methods and software for
+processing and interpreting the data.
+
+This assignment makes use of data from a personal activity monitoring
+device. This device collects data at 5 minute intervals through out the
+day. The data consists of two months of data from an anonymous
+individual collected during the months of October and November, 2012
+and include the number of steps taken in 5 minute intervals each day.
+
+## Data
+
+The data for this assignment can be downloaded from the course web
+site:
+
+* Dataset: [Activity monitoring data](https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip) [52K]
+
+The variables included in this dataset are:
+
+* **steps**: Number of steps taking in a 5-minute interval (missing
+    values are coded as `NA`)
+
+* **date**: The date on which the measurement was taken in YYYY-MM-DD
+    format
+
+* **interval**: Identifier for the 5-minute interval in which
+    measurement was taken
 
 
+
+
+The dataset is stored in a comma-separated-value (CSV) file and there
+are a total of 17,568 observations in this
+dataset.
+
+
+
+## Loading and processing Data
+
+```{r pressure, echo=TRUE}
+if (!file.exists("activity.csv") )
+    {
+     dlurl <- 'http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip'  
+     download.file(dlurl,destfile='repdata%2Fdata%2Factivity.zip',mode='wb')  
+     unzip('repdata%2Fdata%2Factivity.zip')
+    }
+
+My_Data <- read.csv("activity.csv")
+```
 
 ## What is mean total number of steps taken per day?
+```{r, echo=TRUE}
+library(ggplot2)
+steps_per_day <- aggregate(steps ~ date, My_Data, sum)
+hist(steps_per_day$steps, main = paste("Total Steps P/D"), col="red",xlab="No. of Steps")
+```
 
+MEAN
+```{r, echo=TRUE}
+mean(steps_per_day$steps)
+```
+MEDIAN
 
+```{r, echo=TRUE}
+median(steps_per_day$steps)
+```
 
 ## What is the average daily activity pattern?
+```{r, echo=TRUE}
+interval_steps <- aggregate(steps ~ interval, My_Data, mean)
+plot(interval_steps$interval,interval_steps$steps, type="l", xlab="Interval", ylab="No. of Steps",main="AVG No. of Steps per day by Interval")
+```
 
-
+The interval with most steps
+```{r, echo=TRUE}
+max_steps <- interval_steps[which.max(interval_steps$steps),1]
+max_steps
+```
 
 ## Imputing missing values
 
+Total Number of Missing values
 
+```{r, echo=TRUE}
+Missing_values <- sum(!complete.cases(My_Data))
+Missing_values
+```
+
+**Strategy for filling in all of the missing values in the dataset**
+
+```{r, echo=TRUE}
+Steps_AVG <- aggregate(steps ~ interval, data = My_Data, FUN = mean)
+fill_missing_vals <- numeric()
+for (i in 1:nrow(My_Data)) {
+    obs <- My_Data[i, ]
+    if (is.na(obs$steps)) {
+        steps <- subset(Steps_AVG, interval == obs$interval)$steps
+    } else {
+        steps <- obs$steps
+    }
+    fill_missing_vals <- c(fill_missing_vals, steps)
+}
+```
+
+**new dataset that is equal to the original dataset but with the missing data filled in.**
+
+```{r, echo=TRUE}
+new_data <- My_Data
+new_data$steps <- fill_missing_vals
+```
+
+**Histogram of the total number of steps taken each day and Calculate and report the mean and median total number of steps taken per day.**
+
+```{r, echo=TRUE}
+total_steps_day <- aggregate(steps ~ date, data = new_data, sum, na.rm = TRUE)
+hist(total_steps_day$steps, main = paste("Total Steps per Day"), col="red", xlab="No. of Steps")
+#Create Histogram to show difference. 
+hist(steps_per_day$steps, main = paste("Total Steps per Day"), col="Blue", xlab="No. of Steps", add=T)
+legend("topright", c("Imputed", "Non-imputed"), col=c("RED", "Blue"), lwd=15)
+```
+
+Mean
+```{r, echo=TRUE}
+ mean(total_steps_day$steps)
+```
+
+Median
+```{r, echo=TRUE}
+ median(total_steps_day$steps)
+```
+
+**Do these values differ from the estimates from the first part of the assignment?**
+
+```{r, echo=TRUE}
+mean(total_steps_day$steps)-mean(steps_per_day$steps)
+```
+
+```{r, echo=TRUE}
+median(total_steps_day$steps)-median(steps_per_day$steps)
+```
+
+*There is no difference between the mean of the two estimates. The mean values and median range from 10766.19 but the variance between the two estimates show at the median whereby the variance estimates to be 1.188679*
+
+**What is the impact of imputing missing data on the estimates of the total daily number of steps?**
+
+There is a huge impact on imputing missing data because 10000 - 150000 of the estimates and the frequency changes from 27.5 to at least 35 a variance of 7.5
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r, echo=TRUE}
+weekdays <- c("Monday", "Tuesday", "Wednesday", "Thursday", 
+              "Friday")
+new_data$dow = as.factor(ifelse(is.element(weekdays(as.Date(new_data$date)),weekdays), "Weekday", "Weekend"))
+total_steps_day <- aggregate(steps ~ interval + dow, new_data, mean)
+library(lattice)
+xyplot(total_steps_day$steps ~ total_steps_day$interval|total_steps_day$dow, main="Avg Steps per Day per Interval",xlab="5 min Interval", ylab="Steps",layout=c(1,2), type="l")
+```
